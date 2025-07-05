@@ -1,166 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte'
-	import {
-		combinedPresets,
-		sveltePresets,
-		svelteKitPresets,
-		otherPresets,
-		transformAndSortPresets
-	} from '$lib/presets'
+	import { presets, transformAndSortPresets } from '$lib/presets'
 	import PresetListItem from '$lib/components/PresetListItem.svelte'
 	import { SITE_URL } from '$lib/constants'
 	import toast from 'svelte-french-toast'
-	
-	const SSE_ENDPOINT = 'https://svelte-llm.khromov.se/mcp/sse'
-	const STREAMABLE_ENDPOINT = 'https://svelte-llm.khromov.se/mcp/mcp'
-	const NPX_COMMAND = `npx mcp-remote ${STREAMABLE_ENDPOINT}`
 
-	// SVG icon strings to avoid duplication
-	const COPY_ICON = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-		<path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-		<path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
-	</svg>`
-
-	const combinedPresetsFormatted = transformAndSortPresets(combinedPresets)
-	const sveltePresetsFormatted = transformAndSortPresets(sveltePresets)
-	const svelteKitPresetsFormatted = transformAndSortPresets(svelteKitPresets)
-	const otherPresetsFormatted = transformAndSortPresets(otherPresets)
-
-	// Define virtual distilled presets
-	const svelteDistilledPreset = {
-		key: 'svelte-distilled',
-		title: '🔮 Svelte (LLM Distilled)',
-		description: 'AI-condensed version of just the Svelte 5 docs'
-	}
-
-	const svelteKitDistilledPreset = {
-		key: 'sveltekit-distilled',
-		title: '🔮 SvelteKit (LLM Distilled)',
-		description: 'AI-condensed version of just the SvelteKit docs'
-	}
-
-	type DistilledVersion = {
-		filename: string
-		date: string
-		path: string
-		sizeKb: number
-	}
-
-	let distilledVersions = $state<Record<string, DistilledVersion[]>>({
-		'svelte-complete-distilled': [],
-		'svelte-distilled': [],
-		'sveltekit-distilled': []
-	})
-	let loadingVersions = $state(true)
-	let distilledError = $state<string | null>(null)
-
-	// MCP client selection state
-	let selectedClient = $state<string | null>(null)
-
-	const mcpClients = [
-		{
-			id: 'claude-code',
-			name: 'Claude Code',
-			icon: '🔧',
-			description: 'The official Anthropic command-line tool. Run this command to add the MCP server:',
-			instruction: `claude mcp add --transport sse --scope user svelte-llm ${SSE_ENDPOINT}`,
-			isCommand: true
-		},
-		{
-			id: 'claude-desktop',
-			name: 'Claude Desktop',
-			icon: '🖥️',
-			description: 'The official Claude Desktop application with MCP integration support.',
-			url: SSE_ENDPOINT,
-			isDesktop: true,
-			steps: [
-				'Navigate to Settings > Integrations',
-				'Locate the "Integrations" section',
-				'Click "Add custom integration" at the bottom of the section',
-				'Add your integration\'s remote MCP server URL and name it "svelte-llm"',
-				'Finish configuring your integration by clicking "Add"'
-			]
-		},
-		{
-			id: 'github-copilot',
-			name: 'GitHub Copilot',
-			icon: '🐙',
-			description: 'GitHub Copilot extension for VS Code - put this in .vscode/mcp.json inside a "servers" object.',
-			instruction: `{
-  "svelte-llm": {
-    "command": "npx",
-    "args": ["mcp-remote", "${STREAMABLE_ENDPOINT}"]
-  }
-}`,
-			isConfig: true
-		},
-		{
-			id: 'cline',
-			name: 'Cline',
-			icon: '🧑‍💻',
-			url: SSE_ENDPOINT,
-			description: 'Add this URL to your Cline MCP settings. Name the MCP svelte-llm or whatever you like.',
-		},
-		{
-			id: 'others',
-			name: 'Other Clients',
-			icon: '🔗',
-			description: 'Choose the appropriate endpoint for your MCP client:',
-			isOthers: true,
-			endpoints: [
-				{
-					type: 'Server-Sent Events (SSE)',
-					description: 'For clients supporting Server-Sent Events',
-					value: SSE_ENDPOINT
-				},
-				{
-					type: 'Streamable HTTP',
-					description: 'For most modern MCP-compatible clients',
-					value: STREAMABLE_ENDPOINT
-				},
-				{
-					type: 'Local npx command',
-					description: 'For older clients that only support local MCP servers',
-					value: NPX_COMMAND,
-					isCommand: true
-				}
-			]
-		}
-	]
-
-	const loadVersions = async (preset: string) => {
-		try {
-			const response = await fetch(`/api/distilled-versions?preset=${preset}`)
-			if (response.ok) {
-				return await response.json()
-			} else {
-				throw new Error(`Failed to load versions: ${response.status} ${response.statusText}`)
-			}
-		} catch (e) {
-			console.error(`Failed to load distilled versions for ${preset}:`, e)
-			throw e
-		}
-	}
-
-	onMount(async () => {
-		try {
-			loadingVersions = true
-
-			// Load all versions in parallel
-			const presetKeys = Object.keys(distilledVersions)
-			const versionPromises = presetKeys.map((key) => loadVersions(key))
-			const allVersions = await Promise.all(versionPromises)
-
-			// Store results
-			presetKeys.forEach((key, index) => {
-				distilledVersions[key] = allVersions[index]
-			})
-		} catch (e) {
-			distilledError = `Error loading versions: ${e instanceof Error ? e.message : String(e)}`
-		} finally {
-			loadingVersions = false
-		}
-	})
+	const allPresetsFormatted = transformAndSortPresets(presets)
 
 	async function copyToClipboard(text: string) {
 		try {
@@ -175,18 +19,18 @@
 		{
 			title: 'Cursor',
 			description: `Cursor supports adding context via URL using the <a href="https://docs.cursor.com/context/@-symbols/@-link#paste-links">Paste Links</a> feature.`,
-			command: `@${SITE_URL}/[preset]`
+			command: `@${SITE_URL}/shadcn-svelte`
 		},
 		{
 			title: 'Zed',
 			description:
 				'You can use this project directly in Zed using a <a href="https://zed.dev/docs/assistant/commands">/fetch command</a>.',
-			command: `/fetch ${SITE_URL}/[preset]`
+			command: `/fetch ${SITE_URL}/shadcn-svelte`
 		},
 		{
 			title: 'cURL',
 			description: `Let's be real—if you clicked this, you probably already know how to use cURL. But if you don't, here's a quick example:`,
-			command: `curl ${SITE_URL}/[preset] -o context.txt`
+			command: `curl ${SITE_URL}/shadcn-svelte -o context.txt`
 		}
 	]
 </script>
@@ -194,239 +38,50 @@
 <main>
 	<header class="hero">
 		<div class="hero-content">
-			<div class="logo">svelte-llm</div>
-			<h1>Svelte & SvelteKit documentation for AI assistants</h1>
+			<div class="logo">shadcn-svelte-llm</div>
+			<h1>Shadcn-Svelte documentation for AI assistants</h1>
 			<p class="hero-description">
-				Connect your AI coding assistant directly to up-to-date Svelte 5 and SvelteKit documentation
-				via this <strong>Model Context Protocol (MCP) server</strong>, or download preset
-				documentation in llms.txt format and add the docs	 to your context.
+				Connect your AI coding assistant directly to up-to-date Shadcn-Svelte documentation via this <strong
+					>Model Context Protocol (MCP) server</strong
+				>, or download the preset documentation in llms.txt format and add the docs to your context.
 			</p>
 			<p class="hero-note">
 				Documentation is automatically fetched from the <a
 					target="_blank"
-					href="https://github.com/sveltejs/svelte.dev/tree/main/apps/svelte.dev/content"
-					>official documentation</a
+					href="https://github.com/huntabyte/shadcn-svelte">official documentation</a
 				> source on GitHub and updated hourly.
 			</p>
 		</div>
 	</header>
 
-	<section class="mcp-section">
-		<div class="section-header">
-			<div class="mcp-badge-header">
-				<span class="recommended-badge">Recommended</span>
-				<h2>MCP Server Integration</h2>
-			</div>
-			<p class="section-description">
-				Connect your AI assistant directly to live Svelte documentation using the Model Context
-				Protocol. Choose your client below for setup instructions.
-			</p>
-		</div>
-
-		<div class="mcp-clients">
-			<div class="client-selector">
-				{#each mcpClients as client}
-					<button
-						class="client-button"
-						class:active={selectedClient === client.id}
-						onclick={() => (selectedClient = selectedClient === client.id ? null : client.id)}
-					>
-						<span class="client-icon">{client.icon}</span>
-						<span class="client-name">{client.name}</span>
-					</button>
-				{/each}
-			</div>
-
-			{#if selectedClient}
-				{@const client = mcpClients.find((c) => c.id === selectedClient)}
-				{#if client}
-					<div class="client-instructions">
-						<div class="instruction-header">
-							<span class="client-icon-large">{client.icon}</span>
-							<div>
-								<h3>{client.name}</h3>
-								<p>{client.description}</p>
-							</div>
-						</div>
-
-						<div class="instruction-content">
-							{#if client.isDesktop}
-								<div class="desktop-instructions">
-									<div class="url-block">
-										<strong>MCP Server URL:</strong>
-										<code>{client.url}</code>
-										<button class="copy-btn" onclick={() => copyToClipboard(client.url)}>
-											{@html COPY_ICON}
-											Copy
-										</button>
-									</div>
-									<div class="steps-block">
-										<strong>Setup Steps:</strong>
-										<ol class="setup-steps">
-											{#each client.steps as step}
-												<li>{step}</li>
-											{/each}
-										</ol>
-									</div>
-								</div>
-							{:else if client.isCommand}
-								<div class="code-block">
-									<code>{client.instruction}</code>
-									<button class="copy-btn" onclick={() => copyToClipboard(client.instruction)}>
-										{@html COPY_ICON}
-										Copy
-									</button>
-								</div>
-							{:else if client.isConfig}
-								<div class="config-block">
-									<pre><code>{client.instruction}</code></pre>
-									<button class="copy-btn" onclick={() => copyToClipboard(client.instruction)}>
-										{@html COPY_ICON}
-										Copy
-									</button>
-								</div>
-							{:else if client.isOthers}
-								<div class="others-endpoints">
-									{#each client.endpoints as endpoint}
-										<div class="endpoint-item">
-											<div class="endpoint-header">
-												<strong>{endpoint.type}</strong>
-												<span class="endpoint-description">{endpoint.description}</span>
-											</div>
-											<div class={endpoint.isCommand ? 'code-block' : 'url-block'}>
-												<code>{endpoint.value}</code>
-												<button class="copy-btn" onclick={() => copyToClipboard(endpoint.value)}>
-													{@html COPY_ICON}
-													Copy
-												</button>
-											</div>
-										</div>
-									{/each}
-								</div>
-							{:else if client.url}
-								<div class="url-block">
-									<strong>URL:</strong>
-									<code>{client.url}</code>
-									<button class="copy-btn" onclick={() => copyToClipboard(client.url)}>
-										{@html COPY_ICON}
-										Copy
-									</button>
-								</div>
-							{/if}
-						</div>
-					</div>
-				{/if}
-			{/if}
-		</div>
-	</section>
-
 	<section class="usage-section">
 		<div class="section-header">
 			<h2>Direct URL Access</h2>
 			<p class="section-description">
-				Alternative method: Access documentation presets directly via URL for manual download or
-				integration.
+				Access the documentation preset directly via URL for manual download or integration.
 			</p>
 		</div>
 
 		<div class="usage-grid">
 			<div class="usage-card">
-				<h3>Single preset</h3>
+				<h3>Shadcn-Svelte Preset</h3>
 				<div class="code-block">
-					<code>{SITE_URL}/</code><code class="highlight">[preset]</code>
+					<code>{SITE_URL}/</code><code class="highlight">shadcn-svelte</code>
 				</div>
-				<a href="/svelte-complete-medium" class="example-link">View example →</a>
-			</div>
-
-			<div class="usage-card">
-				<h3>Multiple presets</h3>
-				<div class="code-block">
-					<code>{SITE_URL}/</code><code class="highlight">svelte,sveltekit,svelte-cli</code>
-				</div>
-				<a href="/svelte,sveltekit,svelte-cli" class="example-link">View example →</a>
+				<a href="/shadcn-svelte" class="example-link">View example →</a>
 			</div>
 		</div>
 	</section>
 
 	<section class="presets-section">
 		<div class="section-header">
-			<h2>Combined presets</h2>
-			<p class="section-description">
-				Hand-picked combinations of the Svelte 5 + SvelteKit docs in a variety of sizes to fit
-				different LLMs.
-			</p>
+			<h2>Available Presets</h2>
+			<p class="section-description">The available preset for Shadcn-Svelte.</p>
 		</div>
 		<div class="preset-list">
-			{#each combinedPresetsFormatted as preset}
-				<PresetListItem
-					{...preset}
-					distilledVersions={preset.key === 'svelte-complete-distilled'
-						? distilledVersions['svelte-complete-distilled']
-						: undefined}
-					{loadingVersions}
-					{distilledError}
-				/>
-			{/each}
-		</div>
-	</section>
-
-	<section class="presets-section">
-		<div class="section-header">
-			<h2>Svelte 5</h2>
-		</div>
-		<div class="preset-list">
-			<!-- Add the Svelte-only distilled preset at the top of the Svelte section -->
-			<PresetListItem
-				{...svelteDistilledPreset}
-				distilledVersions={distilledVersions['svelte-distilled']}
-				{loadingVersions}
-				{distilledError}
-			/>
-
-			{#each sveltePresetsFormatted as preset}
+			{#each allPresetsFormatted as preset}
 				<PresetListItem {...preset} />
 			{/each}
-		</div>
-	</section>
-
-	<section class="presets-section">
-		<div class="section-header">
-			<h2>SvelteKit</h2>
-		</div>
-		<div class="preset-list">
-			<!-- Add the SvelteKit-only distilled preset at the top of the SvelteKit section -->
-			<PresetListItem
-				{...svelteKitDistilledPreset}
-				distilledVersions={distilledVersions['sveltekit-distilled']}
-				{loadingVersions}
-				{distilledError}
-			/>
-
-			{#each svelteKitPresetsFormatted as preset}
-				<PresetListItem {...preset} />
-			{/each}
-		</div>
-	</section>
-
-	<section class="presets-section">
-		<div class="section-header">
-			<h2>Other</h2>
-		</div>
-		<div class="preset-list">
-			{#each otherPresetsFormatted as preset}
-				<PresetListItem {...preset} />
-			{/each}
-		</div>
-	</section>
-
-	<section class="presets-section">
-		<div class="section-header">
-			<h2>Legacy</h2>
-		</div>
-		<div class="preset-list">
-			<div class="preset-item">
-				<a target="_blank" href="https://v4.svelte.dev/content.json">Svelte 4 Legacy + SvelteKit</a>
-			</div>
 		</div>
 	</section>
 
@@ -454,8 +109,8 @@
 
 	<footer class="site-footer">
 		<p>
-			Maintained by <a href="https://khromov.se" target="_blank">Stanislav Khromov</a> • Forked from
-			<a target="_blank" href="https://twitter.com/didiercatz">Didier Catz</a>
+			Maintained by <a href="https://khromov.se" target="_blank">Stanislav Khromov</a> • Adapted for
+			Shadcn-Svelte
 		</p>
 	</footer>
 </main>
@@ -950,6 +605,7 @@
 
 	.preset-item a:hover {
 		color: #0056b3;
+		text-decoration: none;
 	}
 
 	.integration-grid {

@@ -1,10 +1,10 @@
-## svelte-llm
+## shadcn-svelte-llm
 
-LLM presets for Svelte 5 and SvelteKit. Visit the site at [svelte-llm.khromov.se](https://svelte-llm.khromov.se).
+LLM presets for Shadcn-Svelte documentation, built with Svelte 5 and SvelteKit. Visit the site at [shadcn-svelte.com](https://shadcn-svelte.com/).
 
 ## MCP Endpoint
 
-This service provides an MCP (Model Context Protocol) endpoint for use with AI assistants:
+This service provides an MCP (Model Context Protocol) endpoint for use with AI assistants, offering AI-ready formats of Shadcn-Svelte documentation:
 
 - **SSE (Claude Desktop)**: `https://svelte-llm.khromov.se/mcp/sse`
 - **Streamable HTTP (most other clients)**: `https://svelte-llm.khromov.se/mcp/mcp`
@@ -19,10 +19,10 @@ OG image from https://dynamic-og-image-generator.vercel.app/
 
 # llmctx
 
-llmctx transforms technical documentation into AI-ready formats. It provides a simple way to access condensed, LLM-friendly versions of popular framework and library documentation through preset URLs. This makes it easier for developers to use AI coding assistants like Cursor or Zed with accurate, up-to-date context from official documentation sources.
+llmctx transforms Shadcn-Svelte technical documentation into AI-ready formats. It provides a simple way to access condensed, LLM-friendly versions of Shadcn-Svelte documentation through preset URLs. This makes it easier for developers to use AI coding assistants like Cursor or Zed with accurate, up-to-date context from official Shadcn-Svelte documentation sources.
 
-- Preset URLs for quick access to LLM-optimized documentation
-- Regularly updated content from official documentation
+- Preset URLs for quick access to LLM-optimized Shadcn-Svelte documentation
+- Regularly updated content from official Shadcn-Svelte documentation
 
 ## Supported presets
 
@@ -30,7 +30,7 @@ Visit [llmctx.com](https://llmctx.com) to see all presets.
 
 ### Adding presets
 
-To add a new preset:
+To add a new preset (e.g., for another Shadcn-Svelte component or related library):
 
 1. Fork this repo.
 2. Open the `src/lib/presets.ts` file.

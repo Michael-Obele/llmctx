@@ -209,19 +209,21 @@ export async function fetchMarkdownFiles(
 	}
 
 	// Combine results in the order of glob patterns
-	const orderedResults: unknown[] = []
-	for (const pattern of glob) {
-		const filesForPattern = globResults.get(pattern) || []
-		if (includePathInfo) {
-			// For path info mode, just add the objects directly
-			orderedResults.push(...filesForPattern)
-		} else {
-			// For normal mode, sort and add strings
+	if (includePathInfo) {
+		const orderedResults: { path: string; content: string }[] = []
+		for (const pattern of glob) {
+			const filesForPattern = globResults.get(pattern) || []
+			orderedResults.push(...(filesForPattern as { path: string; content: string }[]))
+		}
+		return orderedResults
+	} else {
+		const orderedResults: string[] = []
+		for (const pattern of glob) {
+			const filesForPattern = globResults.get(pattern) || []
 			orderedResults.push(...sortFilesWithinGroup(filesForPattern as string[]))
 		}
+		return orderedResults
 	}
-
-	return orderedResults
 }
 
 export interface MinimizeOptions {
@@ -274,8 +276,8 @@ function removeDiffMarkersFromContent(content: string): string {
 	const lines = content.split('\n')
 	const processedLines = lines.map((line) => {
 		// Track if we're entering or leaving a code block
-		// eslint-disable-next-line no-useless-escape
-		if (line.trim().startsWith('\`\`\`')) {
+		// Track if we're entering or leaving a code block
+		if (line.trim().startsWith('```')) {
 			inCodeBlock = !inCodeBlock
 			return line
 		}
@@ -283,21 +285,17 @@ function removeDiffMarkersFromContent(content: string): string {
 		// Only process lines within code blocks
 		if (inCodeBlock) {
 			// Handle lines that end with --- or +++ with possible whitespace after
-			// eslint-disable-next-line no-useless-escape
-			line = line.replace(/(\+{3}|\-{3})[\s]*$/g, '')
+			line = line.replace(/(\+\+\+|---)[\s]*$/g, '')
 
 			// Handle triple markers at start while preserving indentation
 			// This captures the whitespace before the marker and adds it back
-			// eslint-disable-next-line no-useless-escape
-			line = line.replace(/^(\s*)(\+{3}|\-{3})\s*/g, '$1')
+			line = line.replace(/^(\s*)(\+\+\+|---)\s*/g, '$1')
 
 			// Handle single + or - markers at start while preserving indentation
-			// eslint-disable-next-line no-useless-escape
 			line = line.replace(/^(\s*)[\+\-](\s)/g, '$1')
 
 			// Handle multi-line diff blocks where --- or +++ might be in the middle of line
-			// eslint-disable-next-line no-useless-escape
-			line = line.replace(/[\s]*(\+{3}|\-{3})[\s]*/g, '')
+			line = line.replace(/[\s]*(\+\+\+|---)[\s]*/g, '')
 		}
 
 		return line

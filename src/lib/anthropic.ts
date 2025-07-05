@@ -112,7 +112,11 @@ export class AnthropicProvider implements LLMProvider {
 				temperature: temperature || 0.7
 			})
 
-			return completion.content[0]?.text || ''
+			const firstContentBlock = completion.content[0]
+			if (firstContentBlock?.type === 'text') {
+				return firstContentBlock.text
+			}
+			return ''
 		} catch (error) {
 			console.error('Error generating code with Anthropic:', error)
 			throw new Error(
